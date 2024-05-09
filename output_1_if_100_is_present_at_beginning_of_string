@@ -1,0 +1,68 @@
+#include <systemc.h>
+SC_MODULE(Monitor) {
+sc_in<bool> clk;
+sc_in<int> data_in;
+void monitor_process() {
+cout << "@" << sc_time_stamp() << ": Received data = " <<
+data_in.read() << endl;
+}
+SC_CTOR(Monitor) {
+SC_METHOD(monitor_process);
+sensitive << clk.pos();
+}
+};
+SC_MODULE(Driver) {
+sc_out<int> data_out;
+sc_event send_event;
+void driver_process() {
+int num = 0;
+while (true) {
+wait(send_event); // Wait for the event to send data
+data_out.write(num);
+num = (num + 1) % 10; // Increment number from 0 to 9
+cyclically
+}
+}
+SC_CTOR(Driver) {
+SC_THREAD(driver_process);
+}
+};
+SC_MODULE(StartsWith100Checker) {
+sc_in<bool> clk;
+sc_in<int> data_in;
+sc_out<bool> output;
+void check_start() {
+while (true) {
+int num1 = data_in.read();
+wait();
+int num2 = data_in.read();
+wait();
+int num3 = data_in.read();
+if (num1 == 1 && num2 == 0 && num3 == 0) {
+output.write(true);
+} else {
+output.write(false);
+}
+}
+}
+SC_CTOR(StartsWith100Checker) {
+SC_THREAD(check_start);
+sensitive << clk.pos();
+}
+};
+int sc_main(int argc, char* argv[]) {
+sc_clock clk("clk", 10, SC_NS);
+sc_signal<int> data;
+sc_signal<bool> output;
+Monitor monitor("monitor");
+monitor.clk(clk);
+monitor.data_in(data);
+Driver driver("driver");
+driver.data_out(data);
+StartsWith100Checker checker("checker");
+checker.clk(clk);
+checker.data_in(data);
+checker.output(output);
+sc_start(100, SC_NS);
+return 0;
+}

@@ -1,0 +1,69 @@
+#include <systemc.h>
+SC_MODULE(Monitor) {
+sc_in<bool> clk;
+sc_in<bool> data;
+void monitor_process() {
+cout << "@" << sc_time_stamp() << ": Received data = " <<
+data.read() << endl;
+}
+SC_CTOR(Monitor) {
+SC_METHOD(monitor_process);
+sensitive << clk.pos();
+}
+};
+SC_MODULE(Driver) {
+sc_out<bool> data;
+sc_event send_event;
+void driver_process() {
+data.write(0); // Initial data
+while (true) {
+wait(send_event); // Wait for the event to send data
+// Toggle data between 0 and 1
+data.write(1 - data.read());
+}
+}
+SC_CTOR(Driver) {
+SC_THREAD(driver_process);
+}
+};
+SC_MODULE(Counter) {
+sc_in<bool> clk;
+sc_in<bool> data;
+sc_out<bool> output;
+int zero_count;
+int one_count;
+void counter_process() {
+zero_count = 0;
+one_count = 0;
+while (true) {
+wait(clk.pos());
+if (data.read() == 0) {
+zero_count++;
+} else {
+one_count++;
+}
+// Output 1 if zero count is odd and one count is even
+output.write(zero_count % 2 != 0 && one_count % 2 ==
+0);
+}
+}
+SC_CTOR(Counter) {
+SC_THREAD(counter_process);
+}
+};
+int sc_main(int argc, char* argv[]) {
+sc_clock clk("clk", 10, SC_NS);
+sc_signal<bool> data;
+sc_signal<bool> output;
+Monitor monitor("monitor");
+monitor.clk(clk);
+monitor.data(data);
+Driver driver("driver");
+driver.data(data);
+Counter counter("counter");
+counter.clk(clk);
+counter.data(data);
+counter.output(output);
+sc_start(100, SC_NS);
+return 0;
+}

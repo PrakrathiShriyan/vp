@@ -1,0 +1,91 @@
+#include <systemc.h>
+SC_MODULE(Monitor) {
+sc_in<bool> clk;
+sc_in<bool> data_in;
+void monitor_process() {
+cout << "@" << sc_time_stamp() << ": Received data = " <<
+data_in.read() << endl;
+}
+SC_CTOR(Monitor) {
+SC_METHOD(monitor_process);
+sensitive << clk.pos();
+}
+};
+SC_MODULE(Driver) {
+sc_out<bool> data_out;
+sc_event send_event;
+void driver_process() {
+string message = "1011101101010110100"; // Example message
+int index = 0;
+while (true) {
+wait(send_event); // Wait for the event to send data
+// Send data
+data_out.write(message[index] == '1');
+index = (index + 1) % message.length();
+}
+}
+SC_CTOR(Driver) {
+SC_THREAD(driver_process);
+}
+};
+SC_MODULE(SubstrDetector) {
+sc_in<bool> clk;
+sc_in<bool> data_in;
+sc_out<bool> output;
+enum States {IDLE, STATE1, STATE2, STATE3} state;
+void fsm_process() {
+while (true) {
+switch (state) {
+case IDLE:
+if (data_in.read()) {
+state = STATE1;
+}
+break;
+case STATE1:
+if (data_in.read()) {
+state = STATE2;
+} else {
+state = IDLE;
+}
+break;
+case STATE2:
+if (data_in.read()) {
+state = STATE3;
+} else {
+state = IDLE;
+}
+break;
+case STATE3:
+if (!data_in.read()) {
+state = IDLE;
+} else {
+output.write(true);
+state = IDLE;
+}
+break;
+}
+wait(clk.pos());
+}
+}
+SC_CTOR(SubstrDetector) {
+SC_THREAD(fsm_process);
+sensitive << clk.pos();
+state = IDLE;
+}
+};
+int sc_main(int argc, char* argv[]) {
+sc_clock clk("clk", 10, SC_NS);
+sc_signal<bool> data;
+sc_signal<bool> output;
+Monitor monitor("monitor");
+monitor.clk(clk);
+monitor.data_in(data);
+Driver driver("driver");
+driver.data_out(data);
+SubstrDetector detector("detector");
+detector.clk(clk);
+detector.data_in(data);
+detector.output(output);
+sc_start(100, SC_NS);
+return 0;
+}
