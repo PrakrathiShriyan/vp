@@ -1,0 +1,70 @@
+#include <systemc.h>
+
+SC_MODULE(ShiftRegister) {
+    sc_in<bool> clk; // Clock input
+    sc_in<bool> reset; // Reset input
+    sc_in<bool> shift_right; // Control signal for right shift
+    sc_in<bool> shift_left; // Control signal for left shift
+    sc_in<sc_uint<4>> data_in; // Input data
+    sc_out<sc_uint<4>> data_out; // Output data
+
+    sc_uint<4> reg; // Internal register
+
+    void shift() {
+        while (true) {
+            wait(); // Wait for a rising clock edge
+
+            if (reset.read()) {
+                reg = 0; // Reset the register
+            } else if (shift_right.read()) {
+                reg = (reg.read().range(2, 0), data_in.read()); // Right shift
+            } else if (shift_left.read()) {
+                reg = (data_in.read(), reg.read().range(3, 1)); // Left shift
+            }
+
+            data_out.write(reg); // Output the current register value
+        }
+    }
+
+    SC_CTOR(ShiftRegister) {
+        SC_THREAD(shift);
+        sensitive << clk.pos(); // Sensitivity to positive clock edge
+    }
+};
+
+int sc_main(int argc, char* argv[]) {
+    sc_signal<bool> clk, reset, shift_right, shift_left;
+    sc_signal<sc_uint<4>> data_in, data_out;
+
+    ShiftRegister shift_register("ShiftRegister");
+    shift_register.clk(clk);
+    shift_register.reset(reset);
+    shift_register.shift_right(shift_right);
+    shift_register.shift_left(shift_left);
+    shift_register.data_in(data_in);
+    shift_register.data_out(data_out);
+
+    // Initialize signals
+    reset.write(false);
+    shift_right.write(false);
+    shift_left.write(false);
+    data_in.write(0);
+
+    // Start the simulation
+    sc_start(1, SC_NS); // Start simulation with a small time step
+
+    // Apply test input
+    data_in.write(0b1010);
+    shift_right.write(true);
+    sc_start(1, SC_NS); // Wait for one clock cycle
+    shift_right.write(false);
+    sc_start(1, SC_NS); // Wait for one clock cycle
+
+    // Print the output
+    cout << "Output: " << data_out.read() << endl;
+
+    // End simulation
+    sc_stop();
+
+    return 0;
+}
