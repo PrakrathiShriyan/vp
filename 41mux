@@ -1,0 +1,72 @@
+#include <systemc.h>
+
+SC_MODULE(Multiplexer) {
+    sc_in<sc_logic> sel;   // Select input
+    sc_in<sc_lv<4>> data;  // Data inputs
+    sc_out<sc_logic> out;  // Output
+
+    void mux_process() {
+        // Select the appropriate data input based on the select signal
+        switch (sel.read().to_uint()) {
+            case 0:
+                out.write(data.read()[0]);
+                break;
+            case 1:
+                out.write(data.read()[1]);
+                break;
+            case 2:
+                out.write(data.read()[2]);
+                break;
+            case 3:
+                out.write(data.read()[3]);
+                break;
+            default:
+                out.write(sc_logic_0);
+                break;
+        }
+    }
+
+    SC_CTOR(Multiplexer) {
+        // Define the process sensitivity to changes in the select signal or data inputs
+        SC_METHOD(mux_process);
+        sensitive << sel << data;
+    }
+};
+
+int sc_main(int argc, char* argv[]) {
+    // Signals
+    sc_signal<sc_logic> sel;
+    sc_signal<sc_lv<4>> data;
+    sc_signal<sc_logic> out;
+
+    // Instantiate the Multiplexer module
+    Multiplexer mux("mux");
+    mux.sel(sel);
+    mux.data(data);
+    mux.out(out);
+
+    // Initialize signals
+    sel = SC_LOGIC_0;
+    data = "0000";
+
+    // Trace file
+    sc_trace_file *tf = sc_create_vcd_trace_file("mux_trace");
+    sc_trace(tf, sel, "sel");
+    sc_trace(tf, data, "data");
+    sc_trace(tf, out, "out");
+
+    // Simulate for 10 time units
+    sc_start(10, SC_NS);
+
+    // Change select signal and data inputs to test the multiplexer
+    sel = SC_LOGIC_1;
+    data = "1100";
+
+    // Simulate for another 10 time units
+    sc_start(10, SC_NS);
+
+    // Close trace file
+    sc_close_vcd_trace_file(tf);
+
+    return 0;
+}
